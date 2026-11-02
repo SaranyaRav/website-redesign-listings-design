@@ -1,0 +1,47 @@
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "15px", "fontFamily": "Segoe UI, Helvetica, Arial"}, "flowchart": {"curve": "basis", "nodeSpacing": 30, "rankSpacing": 44}}}%%
+flowchart LR
+    classDef det fill:#E3F2E1,stroke:#2E7D32,stroke-width:1.5px,color:#0F3D12
+    classDef conn fill:#F3E5F5,stroke:#6A1B9A,stroke-width:1.5px,color:#2E0A40
+    classDef human fill:#FFFFFF,stroke:#6B6B6B,stroke-width:1.5px,stroke-dasharray:6 4,color:#333
+    classDef store fill:#EDEDED,stroke:#555,stroke-width:1px,color:#222
+    classDef ext fill:#FFF8E1,stroke:#B26A00,stroke-width:1.5px,color:#4A2D00
+
+    intake["Intake<br/>form / CSV<br/>+ authorization upload<br/>+ owner field confirmation"]:::det
+    canon["Canonical Business<br/>name · E.164 phone<br/>libpostal address<br/>geocode · categories"]:::det
+    match["Match-First service<br/>search each directory · score<br/>≥0.9 claim · 0.6–0.9 review<br/>&lt;0.6 create"]:::det
+    router["Channel router<br/>per-directory token bucket<br/>batch windows"]:::det
+
+    intake --> canon --> match --> router
+
+    subgraph connectors["Connectors — each a Temporal workflow"]
+        direction TB
+        api["Official API<br/>GBP · Facebook Pages"]:::conn
+        agg["Aggregator<br/>Foursquare · Data Axle<br/>Yext-class"]:::conn
+        bulk["Bulk upload / import<br/>Bing Places via GBP import"]:::conn
+        browser["Browser-assisted<br/>Playwright headful · human present<br/>no solvers · no proxies<br/>no fingerprinting"]:::conn
+    end
+
+    router --> connectors
+
+    htq{{"Human Task Queue<br/>OTP · postcard · CAPTCHA hand-off<br/>match review · appeals<br/>workflow awaits signal ≤ 7 days"}}:::human
+
+    connectors -- "human-required state<br/>save browser state + screenshot" --> htq
+    htq -- "signal: done → resume at checkpoint" --> connectors
+
+    sm["Listing state machine<br/>unmatched → matched → claim_pending<br/>→ submitted → pending_verification → live<br/>rejected · suspended · needs_resync"]:::det
+    track["Tracking / re-sync<br/>DriftCheck every 30 d<br/>ChangeEvent fan-out"]:::det
+
+    connectors --> sm --> track
+    track -. "needs_resync" .-> router
+
+    dirs[("Directories<br/>GBP · Yelp · Apple · Bing<br/>+ ~26 more")]:::ext
+    connectors --> dirs
+
+    subgraph side["Side components — separate from Part 1"]
+        direction TB
+        pg[("Postgres<br/>Business · Listing<br/>SubmissionAttempt · HumanTask")]:::store
+        blob[("Blob<br/>authorizations · encrypted<br/>browser state · screenshots")]:::store
+        kv[("Key Vault<br/>per-tenant OAuth grants<br/>partner keys")]:::store
+        redis[("Redis<br/>per-directory token buckets")]:::store
+    end
+    sm -.-> side

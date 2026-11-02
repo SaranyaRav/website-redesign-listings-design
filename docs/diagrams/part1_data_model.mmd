@@ -1,0 +1,76 @@
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "13px", "fontFamily": "Segoe UI, Helvetica, Arial"}}}%%
+erDiagram
+    CLIENT ||--o{ SITE : owns
+    SITE ||--o{ JOB : "has"
+    JOB ||--o{ STAGE_RUN : "runs"
+    JOB ||--o| DESIGN_RECORD : "produces"
+    JOB ||--o{ DEPLOYMENT : "deploys"
+    JOB ||--o| APPROVAL : "awaits"
+    DEPLOYMENT ||--o| DEPLOYMENT : "rollback_of"
+
+    CLIENT {
+        uuid id PK
+        string name
+        string contact_email
+        string authorization_uri
+        timestamptz signed_at
+    }
+    SITE {
+        uuid id PK
+        uuid client_id FK
+        string domain UK
+        string cpanel_host
+        string cpanel_credential_ref "Key Vault path, never the token"
+        jsonb capabilities_json "probe: sftp|uapi, php_version"
+    }
+    JOB {
+        uuid id PK
+        uuid site_id FK
+        enum status "queued..live|failed|rolled_back|rollback_failed"
+        string seed "sha256(domain)"
+        string current_stage
+        timestamptz created_at
+        timestamptz finished_at
+    }
+    STAGE_RUN {
+        uuid id PK
+        uuid job_id FK
+        enum stage "collect|design|content|build|verify|deploy|post_deploy"
+        string input_hash
+        string artifact_uri "jobs/<id>/<stage>/<hash>/"
+        int attempt
+        enum status "pending|running|succeeded|failed|cached"
+        string prompt_hash
+        string model_version
+    }
+    DESIGN_RECORD {
+        uuid id PK
+        uuid job_id FK
+        jsonb palette_lab "5 x [L,a,b]"
+        string palette_bucket "coarse index for dE query"
+        int font_pair_id
+        string layout_dna UK
+        string layout_family
+        bigint logo_phash
+        timestamptz accepted_at
+    }
+    DEPLOYMENT {
+        uuid id PK
+        uuid job_id FK
+        string release_path "~/releases/<ts>"
+        string backup_uri "blob backups/<site>/<ts>"
+        string manifest_uri
+        jsonb checks_json
+        enum status "deployed|rolled_back|rollback_failed"
+        uuid rollback_of FK
+        timestamptz deployed_at
+    }
+    APPROVAL {
+        uuid id PK
+        uuid job_id FK
+        timestamptz requested_at
+        timestamptz decided_at
+        string decided_by
+        enum decision "approved|rejected|expired"
+        text notes
+    }

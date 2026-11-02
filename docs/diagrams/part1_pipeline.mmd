@@ -1,0 +1,46 @@
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "16px", "fontFamily": "Segoe UI, Helvetica, Arial"}, "flowchart": {"curve": "basis", "nodeSpacing": 26, "rankSpacing": 34}}}%%
+flowchart TB
+    classDef det fill:#D6E8FF,stroke:#1F5FBF,stroke-width:1.5px,color:#0B2A5B
+    classDef ai fill:#FFE2C2,stroke:#C65A00,stroke-width:1.5px,color:#4A2000
+    classDef human fill:#FFFFFF,stroke:#6B6B6B,stroke-width:1.5px,stroke-dasharray:6 4,color:#333
+    classDef store fill:#EDEDED,stroke:#555,stroke-width:1px,color:#222
+    classDef ext fill:#E6F5E6,stroke:#2E7D32,stroke-width:1.5px,color:#0F3D12
+
+    subgraph in["Intake"]
+        direction LR
+        intake["Intake API / CSV"]:::det --> dedupe["Dedupe<br/>normalised domain"]:::det
+    end
+
+    subgraph wf["Temporal workflow — one per site &nbsp;·&nbsp; blue = deterministic &nbsp;·&nbsp; orange = AI-driven &nbsp;·&nbsp; dashed = human"]
+        direction LR
+        collect["1 Collect / Audit<br/>crawl · headers<br/>Lighthouse"]:::det
+        audit_ai["Audit AI<br/>vision OCR<br/>thin / duplicate"]:::ai
+        design["2 Design<br/>palette · fonts<br/>layout DNA · logo"]:::ai
+        content["3 Content<br/>copy rewrite<br/>claim ledger"]:::ai
+        build["4 Build<br/>templates · PHP form<br/>.htaccess"]:::det
+        verify["5 Verify<br/>Lighthouse · html-validate<br/>SEO lint · Semgrep · PHPStan<br/>Playwright viewports"]:::det
+        approval{{"Approval gate<br/>optional<br/>waits on signal"}}:::human
+        deploy["6 Deploy<br/>probe → backup → upload<br/>manifest → 2-rename swap"]:::det
+        post["7 Post-deploy<br/>200s · redirects · headers<br/>TLS · test form"]:::det
+        rollback["Rollback<br/>reverse renames"]:::det
+        cpanel[("Client cPanel<br/>SFTP or UAPI :2083<br/>releases/&lt;ts&gt; ⇄ public_html")]:::ext
+
+        collect --> audit_ai --> design --> content --> build --> verify --> approval --> deploy --> post
+        post -. "any check fails" .-> rollback
+        deploy --> cpanel
+        rollback --> cpanel
+    end
+
+    in --> wf
+
+    subgraph side["Side components"]
+        direction LR
+        pg[("Postgres<br/>Job · StageRun<br/>Deployment")]:::store
+        blob[("Blob Storage<br/>immutable artifacts<br/>backups · 30 d")]:::store
+        kv[("Key Vault<br/>cPanel API tokens")]:::store
+        reg[("Design Registry<br/>palette ΔE · font pair<br/>layout DNA · logo pHash")]:::store
+        llm["LLM adapter<br/>JSON schema · temp≈0<br/>pinned model"]:::ai
+        ops["Ops console<br/>approve · rerun from stage N"]:::det
+    end
+
+    wf -.-> side

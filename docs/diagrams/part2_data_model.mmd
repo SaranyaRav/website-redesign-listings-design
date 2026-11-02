@@ -1,0 +1,100 @@
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "13px", "fontFamily": "Segoe UI, Helvetica, Arial"}}}%%
+erDiagram
+    BUSINESS ||--o{ AUTHORIZATION : "has"
+    BUSINESS ||--o{ OWNER : "has"
+    BUSINESS ||--o{ LISTING : "listed_on"
+    DIRECTORY ||--o{ LISTING : "hosts"
+    LISTING ||--o{ SUBMISSION_ATTEMPT : "attempts"
+    LISTING ||--o{ HUMAN_TASK : "needs"
+    LISTING ||--o{ DRIFT_CHECK : "checked_by"
+    BUSINESS ||--o{ CHANGE_EVENT : "emits"
+    CHANGE_EVENT }o--o{ LISTING : "fans_out_to"
+
+    BUSINESS {
+        uuid id PK
+        string name
+        string phone_e164
+        jsonb address_json "libpostal components"
+        float lat
+        float lng
+        string[] categories
+        jsonb hours_json
+        string website
+    }
+    AUTHORIZATION {
+        uuid id PK
+        uuid business_id FK
+        string document_uri
+        timestamptz signed_at
+        string signer_name
+        timestamptz expires_at
+    }
+    OWNER {
+        uuid id PK
+        uuid business_id FK
+        string name
+        string email
+        string phone
+        jsonb confirmed_fields_json
+    }
+    DIRECTORY {
+        uuid id PK
+        string name UK
+        enum channel_type "official_api|aggregator|bulk_upload|browser_assisted"
+        int rate_limit_qpm
+        string[] verification_methods "postcard|phone|email|video"
+        string tos_url
+        jsonb field_rules_json
+    }
+    LISTING {
+        uuid id PK
+        uuid business_id FK "unique with directory_id"
+        uuid directory_id FK
+        string external_id
+        enum status "unmatched..live|rejected|suspended|needs_resync"
+        float match_score
+        timestamptz last_synced_at
+        string last_error_reason
+    }
+    SUBMISSION_ATTEMPT {
+        uuid id PK
+        uuid listing_id FK
+        string idempotency_key UK
+        enum channel
+        string payload_hash
+        string request_uri
+        string response_uri
+        enum outcome "accepted|rejected|error"
+        enum reason_code "name_guidelines|category_invalid|address_format|phone_mismatch|duplicate_detected|policy_other"
+        int attempt_no "max 3 auto"
+    }
+    HUMAN_TASK {
+        uuid id PK
+        enum type "otp|postcard|captcha_handoff|match_review|appeal|merge_request"
+        uuid listing_id FK
+        jsonb payload_json
+        string state_uri "encrypted browser storage state"
+        string screenshot_uri
+        string view_url "headful container"
+        enum status "open|in_progress|done|expired"
+        string assigned_to
+        timestamptz sla_due_at
+        timestamptz completed_at
+    }
+    CHANGE_EVENT {
+        uuid id PK
+        uuid business_id FK
+        string field
+        string old_value
+        string new_value
+        string source "owner|drift|ops"
+        timestamptz created_at
+    }
+    DRIFT_CHECK {
+        uuid id PK
+        uuid listing_id FK
+        timestamptz checked_at
+        jsonb observed_json
+        jsonb diff_json
+        string action_taken "none|resync|human_task"
+    }
